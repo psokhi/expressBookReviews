@@ -36,22 +36,30 @@ regd_users.post("/login", (req,res) => {
   const username = req.body.username;
   const password = req.body.password;
 
+  // check if username and password are provided
   if (!username || !password) {
-    return res.status(404).json({message: "Error logging in"});
-}
+    return res.status(400).json({message: "Please provide both username and password."});
+  }
 
-if (authenticatedUser(username,password)) {
-  let accessToken = jwt.sign({
-    data: password
-  }, 'access', { expiresIn: 60 * 60 });
+  // check if user is registered
+  const user = users.find(u => u.username === username);
+  if (!user) {
+    return res.status(401).json({message: "Invalid credentials."});
+  }
 
-  req.session.authorization = {
-    accessToken,username
-}
-return res.status(200).send("User successfully logged in");
-} else {
-  return res.status(208).json({message: "Invalid Login. Check username and password"});
-}
+  // check if password is correct
+  if (user.password !== password) {
+    return res.status(401).json({message: "Invalid credentials."});
+  }
+
+  // generate JWT token
+  const accessToken = jwt.sign({ username: user.username }, 'your_secret_key');
+
+  // save token in session
+  req.session.accessToken = accessToken;
+  req.session.username = username;
+  // return success message with access token
+  return res.json({message: "Login successful.", accessToken});
 });
 
 // Task8
@@ -78,6 +86,35 @@ regd_users.put("/auth/review/:isbn", (req, res) => {
   books[isbn].reviews[username] = review;
   return res.json({message: "Review added successfully"});
 });
+
+// Task9
+// Delete review 
+regd_users.delete("/auth/review/:isbn", (req, res) => {
+    const isbn = req.params.isbn;
+    const username = req.session.username;
+    //const user = req.body.username;
+    console.log(isbn);
+    console.log(username);
+  
+    if (!username) {
+      return res.status(401).json({message: "Unauthorized"});
+    }
+  
+    if (!isValid(username)) {
+      return res.status(401).json({message: "Invalid username"});
+    }
+  
+    if (!books[isbn]) {
+      return res.status(400).json({message: "Invalid ISBN"});
+    }
+  
+    if (!books[isbn].reviews[username]) {
+      return res.status(400).json({message: "Review not found for the given ISBN and username"});
+    }
+  
+    delete books[isbn].reviews[username];
+    return res.status(200).json({message: "Review deleted successfully"});
+  });
 
 module.exports.authenticated = regd_users;
 module.exports.isValid = isValid;
